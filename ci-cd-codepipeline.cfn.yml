@@ -1,11 +1,7 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
-
 Description: EKSWSV1
-
-
 Parameters:
-
   EksClusterName:
     Type: String
     Description: The name of the EKS cluster created
@@ -13,15 +9,14 @@ Parameters:
     MinLength: 1
     MaxLength: 100
     ConstraintDescription: You must enter the EKS cluster name
-
   GitSourceRepo:
     Type: String
-    Description: GitHub source repository - must contain a Dockerfile and buildspec.yml in the base
+    Description: GitHub source repository - must contain a Dockerfile and
+      buildspec.yml in the base
     Default: 04_Server-Deployment-and-Containerization
     MinLength: 1
     MaxLength: 100
     ConstraintDescription: You must enter a GitHub repository name
-
   GitBranch:
     Type: String
     Default: main
@@ -29,7 +24,6 @@ Parameters:
     MinLength: 1
     MaxLength: 100
     ConstraintDescription: You must enter a GitHub repository branch name
-
   GitHubToken:
     Type: String
     NoEcho: true
@@ -37,7 +31,6 @@ Parameters:
     MinLength: 3
     MaxLength: 100
     ConstraintDescription: You must enter a GitHub personal access token
-
   GitHubUser:
     Type: String
     Default: krillavilla
@@ -45,7 +38,6 @@ Parameters:
     MinLength: 3
     MaxLength: 100
     ConstraintDescription: You must enter a GitHub username or organization
-
   CodeBuildDockerImage:
     Type: String
     Default: aws/codebuild/docker:17.09.0
@@ -53,7 +45,6 @@ Parameters:
     MinLength: 3
     MaxLength: 100
     ConstraintDescription: You must enter a CodeBuild Docker image
-
   KubectlRoleName:
     Type: String
     Default: UdacityFlaskDeployCBKubectlRole
@@ -61,8 +52,6 @@ Parameters:
     MinLength: 3
     MaxLength: 100
     ConstraintDescription: You must enter a kubectl IAM role
-
-
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -100,26 +89,24 @@ Metadata:
         default: kubectl IAM role
       EksClusterName:
         default: EKS cluster name
-
-
 Resources:
-
   EcrDockerRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
-
   CodePipelineArtifactBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
-
   CustomResourceLambda:
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        ZipFile: |
+        ZipFile: >
           import json
+
           import boto3
+
           from botocore.vendored import requests
+
           def handler(event, context):
             response = {
               'Status': 'SUCCESS',
@@ -158,12 +145,10 @@ Resources:
             headers = {'content-type': '', "content-length": str(len(response_body)) }
             put_response = requests.put(event['ResponseURL'], headers=headers, data=response_body)
             return response
-
       Handler: index.handler
-      Role: !GetAtt CustomResourceLambdaExecutionRole.Arn
+      Role: CustomResourceLambdaExecutionRole.Arn
       Runtime: python2.7
       Timeout: 300
-
   CustomResourceLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -184,22 +169,20 @@ Resources:
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
+              - Resource: arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
                 Effect: Allow
                 Action:
                   - iam:GetRole
                   - iam:UpdateAssumeRolePolicy
-
   KubectlAssumeRoleCustomResource:
     Type: Custom::CustomResource
     Properties:
-      ServiceToken: !GetAtt CustomResourceLambda.Arn
-      KubectlRoleName: !Ref KubectlRoleName
-      CodeBuildServiceRoleArn: !GetAtt CodeBuildServiceRole.Arn
+      ServiceToken: CustomResourceLambda.Arn
+      KubectlRoleName: KubectlRoleName
+      CodeBuildServiceRoleArn: CodeBuildServiceRole.Arn
     DependsOn:
       - CustomResourceLambda
       - CodeBuildServiceRole
-
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -227,7 +210,7 @@ Resources:
                   - codecommit:GetUploadArchiveStatus
                   - codecommit:CancelUploadArchive
                   - iam:PassRole
-              - Resource: !Sub arn:aws:s3:::${CodePipelineArtifactBucket}/*
+              - Resource: arn:aws:s3:::${CodePipelineArtifactBucket}/*
                 Effect: Allow
                 Action:
                   - s3:PutObject
@@ -235,7 +218,6 @@ Resources:
                   - s3:GetObjectVersion
                   - s3:GetBucketVersioning
     DependsOn: CodePipelineArtifactBucket
-
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -252,29 +234,29 @@ Resources:
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
+              - Resource: arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
                 Effect: Allow
                 Action:
                   - sts:AssumeRole
-              - Resource: '*'
+              - Resource: "*"
                 Effect: Allow
                 Action:
                   - eks:Describe*
-              - Resource: '*'
+              - Resource: "*"
                 Effect: Allow
                 Action:
                   - ssm:GetParameters
-              - Resource: '*'
+              - Resource: "*"
                 Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-              - Resource: '*'
+              - Resource: "*"
                 Effect: Allow
                 Action:
                   - ecr:GetAuthorizationToken
-              - Resource: '*'
+              - Resource: "*"
                 Effect: Allow
                 Action:
                   - ec2:CreateNetworkInterface
@@ -285,13 +267,13 @@ Resources:
                   - ec2:DescribeSecurityGroups
                   - ec2:DescribeVpcs
                   - ec2:CreateNetworkInterfacePermission
-              - Resource: !Sub arn:aws:s3:::${CodePipelineArtifactBucket}/*
+              - Resource: arn:aws:s3:::${CodePipelineArtifactBucket}/*
                 Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:GetObjectVersion
-              - Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${EcrDockerRepository}
+              - Resource: arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${EcrDockerRepository}
                 Effect: Allow
                 Action:
                   - ecr:GetDownloadUrlForLayer
@@ -301,7 +283,6 @@ Resources:
                   - ecr:InitiateLayerUpload
                   - ecr:UploadLayerPart
                   - ecr:CompleteLayerUpload
-
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -312,29 +293,28 @@ Resources:
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
         Type: LINUX_CONTAINER
-        Image: !Ref CodeBuildDockerImage
+        Image: CodeBuildDockerImage
         EnvironmentVariables:
           - Name: REPOSITORY_URI
-            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrDockerRepository}
+            Value: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrDockerRepository}
           - Name: REPOSITORY_NAME
-            Value: !Ref GitSourceRepo
+            Value: GitSourceRepo
           - Name: REPOSITORY_BRANCH
-            Value: !Ref GitBranch
+            Value: GitBranch
           - Name: EKS_CLUSTER_NAME
-            Value: !Ref EksClusterName
+            Value: EksClusterName
           - Name: EKS_KUBECTL_ROLE_ARN
-            Value: !Sub arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
-      Name: !Ref AWS::StackName
-      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+            Value: arn:aws:iam::${AWS::AccountId}:role/${KubectlRoleName}
+      Name: AWS::StackName
+      ServiceRole: CodeBuildServiceRole.Arn
     DependsOn: KubectlAssumeRoleCustomResource
-
   CodePipelineGitHub:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      RoleArn: CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
-        Location: !Ref CodePipelineArtifactBucket
+        Location: CodePipelineArtifactBucket
       Stages:
         - Name: Source
           Actions:
@@ -345,10 +325,10 @@ Resources:
                 Version: 1
                 Provider: GitHub
               Configuration:
-                Owner: !Ref GitHubUser
-                Repo: !Ref GitSourceRepo
-                Branch: !Ref GitBranch
-                OAuthToken: !Ref GitHubToken
+                Owner: GitHubUser
+                Repo: GitSourceRepo
+                Branch: GitBranch
+                OAuthToken: GitHubToken
               OutputArtifacts:
                 - Name: App
               RunOrder: 1
@@ -361,7 +341,7 @@ Resources:
                 Version: 1
                 Provider: CodeBuild
               Configuration:
-                ProjectName: !Ref CodeBuildProject
+                ProjectName: CodeBuildProject
               InputArtifacts:
                 - Name: App
               OutputArtifacts:
