@@ -1,6 +1,7 @@
+---
 apiVersion: v1
 data:
-  mapRoles: |
+  mapRoles: >
     - groups:
       - system:bootstrappers
       - system:nodes
@@ -14,7 +15,7 @@ data:
     []
 kind: ConfigMap
 metadata:
-  creationTimestamp: "<AUTO_GENERATED_VALUE>"
+  creationTimestamp: <AUTO_GENERATED_VALUE>
   name: aws-auth
   namespace: kube-system
   resourceVersion: <AUTO_GENERATED_VALUE>
